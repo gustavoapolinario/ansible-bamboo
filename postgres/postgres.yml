@@ -1,0 +1,84 @@
+---
+- hosts: all
+  become: yes  # Run tasks as sudo
+
+  vars_files:
+    vars.yml
+
+  tasks:
+    - name: Install PostgreSQL
+      become: yes  # Run tasks as sudo
+      apt:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+        - postgresql-{{ pg_version }}
+        - postgresql-contrib
+        - postgresql-client
+        - python3-psycopg2
+        - acl
+
+    - name: Allow remote connections to PostgreSQL
+      become: yes  # Run tasks as sudo
+      replace:
+        path: "/etc/postgresql/{{ pg_version }}/main/postgresql.conf"
+        regexp: "#listen_addresses = 'localhost'"
+        replace: "listen_addresses = '*'"
+      notify: Restart PostgreSQL
+
+    # - name: Allow all connections in pg_hba.conf
+    #   become: yes  # Run tasks as sudo
+    #   lineinfile:
+    #     path: "/etc/postgresql/{{ pg_version }}/main/pg_hba.conf"
+    #     line: "host    all             all             0.0.0.0/0               md5"
+    #   notify: Restart PostgreSQL
+
+    # - name: Allow all connections in pg_hba.conf
+    #   become: yes
+    #   lineinfile:
+    #     path: "/etc/postgresql/{{ pg_version }}/main/pg_hba.conf"
+    #     line: "local   all             postgres                                peer"
+    #   notify: Restart PostgreSQL
+
+    - name: Allow all connections in pg_hba.conf
+      become: yes
+      blockinfile:
+        dest: "/etc/postgresql/{{ pg_version }}/main/pg_hba.conf"
+        block: "{{ lookup('template', 'pg_hba.j2') }}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK FOR POSTGRE ACCESS"
+      notify: Restart PostgreSQL
+
+    - name: Flush handlers
+      meta: flush_handlers
+      
+
+    - name: Create a new user and grant access to the database and table
+      become: yes
+      become_user: "{{pg_admin_user}}"
+      community.postgresql.postgresql_user:
+        name: "{{ pg_app_user }}"
+        password: "{{ pg_app_user }}"
+        encrypted: true
+        port: "{{pg_port}}"
+        state: "present"
+        login_user: "{{pg_admin_user}}"
+      become: yes
+      become_user: "{{pg_admin_user}}"
+
+    - name: Create a new database
+      become: yes
+      become_user: "{{pg_admin_user}}"
+      community.postgresql.postgresql_db:
+        name: "{{ pg_app_db }}"
+        owner: "{{ pg_app_user }}"
+        encoding: UTF-8
+        template: template0
+
+  handlers:
+    - name: Restart PostgreSQL
+      become: yes  # Run tasks as sudo
+      service:
+        name: postgresql
+        state: restarted

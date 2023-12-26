@@ -1,0 +1,6 @@
+---
+pg_version: "14"
+pg_port: 5432
+pg_admin_user: "postgres"
+pg_app_user: "bamboo"
+pg_app_db: "bamboo"

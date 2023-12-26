@@ -1,0 +1,53 @@
+---
+- hosts: all
+  become: true
+  tasks:
+  - name: Install necessary packages
+    apt:
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+      - openjdk-11-jdk
+
+  - shell: echo JAVA_HOME is $JAVA_HOME
+    environment:
+      JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+    register: shellout
+  - debug: var=shellout
+
+  - name: Set JAVA_HOME
+    lineinfile:
+      dest: /etc/environment
+      state: present
+      regexp: '^JAVA_HOME'
+      line: 'JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64'
+
+  - name: Create bamboo directory
+    file:
+      path: /home/vagrant/bamboo/
+      state: directory
+
+  - name: bamboo installation file
+    ansible.builtin.unarchive:
+      src: ./atlassian-bamboo-9.2.8.tar.gz
+      dest: /home/vagrant/bamboo/
+      owner: vagrant
+      group: vagrant
+
+  - name: Create bamboo directory
+    file:
+      path: /home/vagrant/bamboo-data/
+      state: directory
+
+  - name: Add bamboo home on propetie
+    ansible.builtin.lineinfile:
+      path: /home/vagrant/bamboo/atlassian-bamboo-9.2.8/atlassian-bamboo/WEB-INF/classes/bamboo-init.properties
+      regexp: '^bamboo.home='
+      line: bamboo.home=/home/vagrant/bamboo-data/
+
+  - name: Run bamboo
+    command: /home/vagrant/bamboo/atlassian-bamboo-9.2.8/bin/start-bamboo.sh
+
+
