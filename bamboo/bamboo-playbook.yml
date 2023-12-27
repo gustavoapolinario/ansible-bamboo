@@ -1,6 +1,8 @@
 ---
-- hosts: all
+- hosts: bamboo
   become: true
+  vars:
+    bamboo_installation_file: atlassian-bamboo-9.2.8.tar.gz
   tasks:
   - name: Install necessary packages
     apt:
@@ -31,7 +33,7 @@
 
   - name: bamboo installation file
     ansible.builtin.unarchive:
-      src: ./atlassian-bamboo-9.2.8.tar.gz
+      src: "./{{ bamboo_installation_file }}"
       dest: /home/vagrant/bamboo/
       owner: vagrant
       group: vagrant

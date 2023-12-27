@@ -1,0 +1,9 @@
+---
+- name: Include playbook bamboo
+  ansible.builtin.import_playbook: bamboo/bamboo-playbook.yml
+
+- name: Include playbook bamboo-postgres
+  ansible.builtin.import_playbook: postgres/bamboo-postgres.yml
+
+- name: Include playbook bamboo-worker
+  ansible.builtin.import_playbook: bamboo/bamboo-worker.yml

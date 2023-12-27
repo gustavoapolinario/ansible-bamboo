@@ -1,55 +1,79 @@
 ---
-- hosts: all
+- hosts: bambooworker
   become: true
+  vars:
+    bamboo_agent_jar: atlassian-bamboo-agent-installer-9.2.8.jar
   tasks:
-  - name: Install necessary packages
-    apt:
-      name: "{{ packages }}"
-      state: present
-      update_cache: yes
-    vars:
-      packages:
-      - openjdk-11-jdk
+    - name: Install necessary packages
+      apt:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+        - openjdk-11-jdk
 
-  - shell: echo JAVA_HOME is $JAVA_HOME
-    environment:
-      JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
-    register: shellout
-  - debug: var=shellout
+    - shell: echo JAVA_HOME is $JAVA_HOME
+      environment:
+        JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+      register: shellout
+    - debug: var=shellout
 
-  - name: Set JAVA_HOME
-    lineinfile:
-      dest: /etc/environment
-      state: present
-      regexp: '^JAVA_HOME'
-      line: 'JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64'
+    - name: Set JAVA_HOME
+      lineinfile:
+        dest: /etc/environment
+        state: present
+        regexp: '^JAVA_HOME'
+        line: 'JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64'
 
-  - name: Create bamboo directory
-    file:
-      path: /home/vagrant/bamboo/
-      state: directory
+    - name: Create bamboo directory
+      file:
+        path: /home/vagrant/bamboo/
+        state: directory
 
-  - name: Copy bamboo agent jar file
-    copy:
-      src: ./atlassian-bamboo-agent-installer-9.2.8.jar
-      dest: /home/vagrant/bamboo/
-      remote_src: no
-      owner: vagrant
-      group: vagrant
-      mode: '0644'
+    - name: Copy bamboo agent jar file
+      copy:
+        src: "./{{ bamboo_agent_jar }}"
+        dest: /home/vagrant/bamboo/
+        remote_src: no
+        owner: vagrant
+        group: vagrant
+        mode: '0644'
+      notify: restart bamboo
 
-  - name: Create bamboo agent directory
-    file:
-      path: /home/vagrant/bamboo-agent-home/
-      state: directory
+    - name: Create bamboo agent directory
+      file:
+        path: /home/vagrant/bamboo-agent-home/
+        state: directory
 
-  - name: change owner bamboo agent directory
-    command: chown vagrant:vagrant /home/vagrant/bamboo-agent-home/
+    - name: change owner bamboo agent directory
+      command: chown vagrant:vagrant /home/vagrant/bamboo-agent-home/
 
-  - name: Run bamboo
-    command: java -Dbamboo.home=/home/vagrant/bamboo-agent-home/ -jar /home/vagrant/bamboo/atlassian-bamboo-agent-installer-9.2.8.jar http://192.168.56.50:8085/agentServer/ install
+    - name: get file status
+      stat:
+        path: /home/vagrant/bamboo-agent-home/bin/bamboo-agent.sh
+      register: bambooagent
 
-  - name: Run bamboo
-    command: /home/vagrant/bamboo-agent-home/bin/bamboo-agent.sh installstart
+    # - name: Run bamboo
+    #   command: "java -Dbamboo.home=/home/vagrant/bamboo-agent-home/ -jar /home/vagrant/bamboo/{{ bamboo_agent_jar }} http://192.168.56.50:8085/agentServer/ install"
+    #   when: not bambooagent.stat.exists
+    #   notify: restart bamboo
+
+    # - name: Run bamboo
+    #   command: /home/vagrant/bamboo-agent-home/bin/bamboo-agent.sh installstart
+
+  handlers:
+    - name: install bamboo agent from jar
+      command: "java -Dbamboo.home=/home/vagrant/bamboo-agent-home/ -jar /home/vagrant/bamboo/{{ bamboo_agent_jar }} http://192.168.56.50:8085/agentServer/ install"
+      when: not bambooagent.stat.exists
+      listen: restart bamboo
+
+    - name: install bamboo agent
+      command: /home/vagrant/bamboo-agent-home/bin/bamboo-agent.sh install
+      listen: restart bamboo
+
+    - name: restart bamboo agent
+      command: /home/vagrant/bamboo-agent-home/bin/bamboo-agent.sh restart
+      listen: restart bamboo
 
 
